@@ -23,20 +23,20 @@ interface NavigatorWithConnection extends Navigator {
 
 export interface Controller {
     // Image Handling
-    onGetImage(imageID: string): Promise<string | null>;
-    getImageList(): Promise<ImageItem[]>;
+    onGetImage(firebaseUID: string, imageID: string): Promise<string | null>;
+    getImageList(firebaseUID: string): Promise<ImageItem[]>;
 
     // syncConfig
-    syncConfig(): Promise<void>;
-    handleBack():void;
-    handleNext():void;
-    handlePrev():void;
+    syncConfig(firebaseUID: string): Promise<void>;
+    handleBack(firebaseUID: string):void;
+    handleNext(firebaseUID: string):void;
+    handlePrev(firebaseUID: string):void;
 
     // Preset
-    getPresets(): Promise<Preset[]>;
-    createPreset(name: string, settings: AdjustmentState): Promise<Preset | null>;
-    deletePreset(presetId: string): Promise<void>;
-    renamePreset(presetId: string, newName: string): Promise<void>;
+    getPresets(firebaseUID: string): Promise<Preset[]>;
+    createPreset(firebaseUID: string, name: string, settings: AdjustmentState): Promise<Preset | null>;
+    deletePreset(firebaseUID: string, presetId: string): Promise<void>;
+    renamePreset(firebaseUID: string, presetId: string, newName: string): Promise<void>;
 }
 
 export type AdjustmentState = {
@@ -75,7 +75,7 @@ const initialAdjustments: AdjustmentState = {
 
 const clamp = (value: number) => Math.max(-100, Math.min(100, value));
 
-export function useHonchoEditor(controller: Controller) {
+export function useHonchoEditor(controller: Controller, initImageId: string, firebaseUID: string) {
     // MARK: - Core Editor State & Refs
     const editorRef = useRef<HonchoEditor | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -373,26 +373,8 @@ export function useHonchoEditor(controller: Controller) {
     }, [controller, loadImageFromUrl]);
 
     useEffect(() => {
-        // Define the function that the native app will call to load an image
-        const loadInitialImageFromNative = (imageId: string) => {
-            if (typeof imageId === 'string' && imageId) {
-                console.log(`[WebView Bridge] Received command to load imageId: ${imageId}`);
-                // Use the loadImageFromId function directly from the hook's scope
-                loadImageFromId(imageId);
-            } else {
-                console.error(`[WebView Bridge] Invalid imageId received from native:`, imageId);
-            }
-        };
-
-        // Expose both functions on the window object for native code to access
-        (window as any).loadInitialImageFromNative = loadInitialImageFromNative;
-
-        // Cleanup function to remove the global handlers when the component unmounts
-        return () => {
-            delete (window as any).loadInitialImageFromNative;
-            delete (window as any).setAuthToken;
-        };
-    }, [loadImageFromId]);
+        controller.onGetImage(firebaseUID, initImageId);
+    }, []);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = event.target?.files;
